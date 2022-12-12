@@ -109,14 +109,16 @@
       const rewards = await getRewards();
       const tokenSupply = await getTokenSupply();
       const stakedPlusRewards = await getBalanceOfStakingContract();
-      const percentStaked = stakedPlusRewards.sub(rewards).mul(100).div(tokenSupply);
+      const trueStaked = stakedPlusRewards.sub(rewards);
+      const percentStaked = trueStaked.mul(100).div(tokenSupply);
       // get the DOM elements and update them
       // total supply truncated at the first decimal
       const rewardString = ethers.utils.formatEther(rewards);
       const supplyString = ethers.utils.formatEther(tokenSupply);
+      const trueStakedString = ethers.utils.formatEther(trueStaked);
       const percentStakedString = percentStaked.toString();
       document.getElementById("total-supply").innerHTML = supplyString.substring(0, supplyString.indexOf(".") + 3);
-      document.getElementById("total-staked").innerHTML = rewardString.substring(0, rewardString.indexOf(".") + 3);
+      document.getElementById("total-staked").innerHTML = trueStakedString.substring(0, trueStakedString.indexOf(".") + 3);
       document.getElementById("total-rewards-added").innerHTML = rewardString.substring(0, rewardString.indexOf(".") + 3);
       document.getElementById("percentage-staked").innerHTML = percentStakedString.substring(0, percentStakedString.indexOf(".") + 3) + "%";
     }
