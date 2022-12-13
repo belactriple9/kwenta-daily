@@ -43,11 +43,16 @@
       </div>
       <div class="content-box">
         <p class="number" id="total-staked">0</p>
-        <p class="text">Total Staked KWENTA</p>
+        <p class="text">Total Staked Liquid KWENTA</p>
       </div>
       <div class="content-box">
         <p class="number" id="total-rewards-added">0</p>
         <p class="text">Total Rewards added</p>
+      </div>
+      <!-- next row -->
+      <div class="content-box">
+        <p class="number" id="total-escrowed-staking">0</p>
+        <p class="text">Total Escrowed Staking</p>
       </div>
       <div class="content-box">
         <!-- filler, ignore -->
@@ -57,6 +62,18 @@
         <p class="number" id="percentage-staked">0.00%</p>
         <p class="text">of KWENTA Staked</p>
       </div>
+      <!-- next row -->
+      <div class="content-box">
+        <p class="number" id="total-burnt">0</p>
+        <p class="text">Total Forfeit vKWENTA to the DAO</p>
+      </div>
+      <div class="content-box">
+        <!-- filler, ignore -->
+        <div></div>
+      </div>
+      <div class="content-box">
+        <p class="number" id="reward-apy">0%</p>
+        <p class="text">KWENTA Staking APY</p>
     </div>
 
 
@@ -65,25 +82,32 @@
   </div>
   </div>
   <script>
-    const optimism_rpc = "https://mainnet.optimism.io";
+    const optimism_rpc = "https://optimism-mainnet.public.blastapi.io";
+    const secondsPerYear = 31536000; // self explanatory
+    const stakingRewardsRatio = 60; // 60% of rewards go to stakers
+    const kwentaTokenAddress = "0x920Cf626a271321C151D027030D5d08aF699456b"; // self explanatory
+    const stakingAddress = "0x6e56A5D49F775BA08041e28030bc7826b13489e0"; // anything in here that isn't rewards is in circulation;
+    const tradingIncentivesAddress = "0xf486A72E8c8143ACd9F65A104A16990fDb38be14"; // anything not redeemed is not in circulation
+    const vKWENTARedemptionAddress = "0x8132EE584bCD6f8Eb1bea141DB7a7AC1E72917b9"; // anything not redeemed is not in circulation
+    const veKWENTARedemptionAddress = "0xc7088ac8f287539567e458c7d08c2a1470fd25b7"; // anything not redeeemd is not in circulation
+    const UnknownGnosisSafeAddress = "0xf510a2ff7e9dd7e18629137ada4eb56b9c13e885"; // kwenta team multisig
+    const RewardEscrowAddress = "0x1066a8eb3d90af0ad3f89839b974658577e75be2"; // lets users "stake" their veKWENTA to be allowed to claim rewards from 0x6e56a5d49f775ba08041e28030bc7826b13489e0; has a read only function "totalEscrowedBalance" to track the number of veKWENTA staked
+    const DAOTreasurySafeAddress = "0x82d2242257115351899894ef384f779b5ba8c695"; // this is where the fees go to, the DAO treasury. The fees are in sUSD. This is also where forfeit KWENTA goes when a user redeems their vKWENTA
+    const sUSDAddress = "0x8c6f28f2F1A3C87F0f938b96d27520d9751ec8d9"; // self explanatory
 
-    const kwentaTokenAddress = "0x920Cf626a271321C151D027030D5d08aF699456b";
-    const stakingAddress = "0x6e56A5D49F775BA08041e28030bc7826b13489e0";
-    // we want the topic "RewardAdded(reward)"
-    const topic = ethers.utils.id("RewardAdded(uint256)");
     const provider = new ethers.providers.JsonRpcProvider(optimism_rpc);
-    console.log(topic)
-    const rewardFilter = {
-      // address: stakingAddress,
-      topics: [topic]
-    };
+
 
     const getRewards = async () => {
+      const topic = ethers.utils.id("RewardAdded(uint256)");
+      const rewardFilter = {
+        // address: stakingAddress,
+        topics: [topic]
+      };
       // const rewardList = await provider.getLogs(rewardFilter); // not working??
       const rewardList = await fetch(`https://api-optimistic.etherscan.io/api?module=logs&action=getLogs&address=0x6e56A5D49F775BA08041e28030bc7826b13489e0&topic0=${topic}&page=1&apikey=YourApiKeyToken`)
       .then(response => response.json())
       .then(data => {return data.result});
-      console.log(rewardList);
       const sumRewards = rewardList.reduce((acc, reward) => {
         const rewardAmount = ethers.utils.defaultAbiCoder.decode(["uint256"], reward.data)[0];
         return acc.add(rewardAmount);
@@ -104,23 +128,118 @@
       return ethers.BigNumber.from(balance);
     };
 
+    const getEscrowedBalance = async () => {
+      const escrowContract = new ethers.Contract(RewardEscrowAddress, ["function totalEscrowedBalance() view returns (uint256)"], provider);
+      const balance = await escrowContract.totalEscrowedBalance();
+      return ethers.BigNumber.from(balance);
+    };
+
+    /*
+    const getBurntKWENTA = async () => {
+      const burnTopic = ethers.utils.id("Transfer(address,address,uint256)");
+      const zeroAddress = "0x0000000000000000000000000000000000000000";
+      const zeroAddressPadded = ethers.utils.hexZeroPad(zeroAddress, 32);
+      const burnFilter = {
+        address: kwentaTokenAddress,
+        topics: [burnTopic, null, zeroAddressPadded]
+      };
+      // const burnList = await provider.getLogs(burnFilter);
+      const burnList = await fetch(`https://api-optimistic.etherscan.io/api?module=logs&action=getLogs&address=${kwentaTokenAddress}&topic0=${burnTopic}&topic2=${zeroAddressPadded}&page=1&apikey=YourApiKeyToken`)
+        .then(response => response.json())
+        .then(data => {return data.result});
+      console.log(burnList);
+      const sumBurnt = burnList.reduce((acc, burn) => {
+        const burnAmount = ethers.utils.defaultAbiCoder.decode(["uint256"], burn.data)[0];
+        return acc.add(burnAmount);
+      }, ethers.BigNumber.from(0));
+      return sumBurnt;
+    }*/
+
+    const getForfeitKWENTA = async () => {
+      const topic = ethers.utils.id("Transfer(address,address,uint256)");
+      // we have defined the safe above, but we need to pad it to 32 bytes
+      const safePadded = ethers.utils.hexZeroPad(DAOTreasurySafeAddress, 32);
+      const escrowContractPadded = ethers.utils.hexZeroPad(RewardEscrowAddress, 32);
+      const forfeitFilter = {
+        address: kwentaTokenAddress,
+        topics: [topic, escrowContractPadded, safePadded]
+      };
+      // const forfeitList = await provider.getLogs(forfeitFilter);
+      const forfeitList = await fetch(`https://api-optimistic.etherscan.io/api?module=logs&action=getLogs&address=${kwentaTokenAddress}&topic0=${topic}&topic1=${escrowContractPadded}&topic2=${safePadded}&page=1&apikey=YourApiKeyToken`)
+        .then(response => response.json())
+        .then(data => {return data.result});
+      const sumForfeits = forfeitList.reduce((acc, forfeit) => {
+        const forfeitAmount = ethers.utils.defaultAbiCoder.decode(["uint256"], forfeit.data)[0];
+        return acc.add(forfeitAmount);
+      }, ethers.BigNumber.from(0));
+      return sumForfeits;
+    }
+
+    const getBalanceOfvKwentaRedemptionContract = async () => {
+      const tokenContract = new ethers.Contract(kwentaTokenAddress, ["function balanceOf(address) view returns (uint256)"], provider);
+      const balance = await tokenContract.balanceOf(vKwentaRedemptionAddress);
+      return ethers.BigNumber.from(balance);
+    };
+
+    const getBalanceOfveKwentaRedemptionContract = async () => {
+      const tokenContract = new ethers.Contract(kwentaTokenAddress, ["function balanceOf(address) view returns (uint256)"], provider);
+      const balance = await tokenContract.balanceOf(veKwentaRedemptionAddress);
+      return ethers.BigNumber.from(balance);
+    };
+
+    const getBalanceOfTradingIncentiveContract = async () => {
+      const tokenContract = new ethers.Contract(kwentaTokenAddress, ["function balanceOf(address) view returns (uint256)"], provider);
+      const balance = await tokenContract.balanceOf(tradingIncentiveAddress);
+      return ethers.BigNumber.from(balance);
+    };
+
+    const getRewardRate = async () => {
+      const stakingContract = new ethers.Contract(stakingAddress, ["function rewardRate() view returns (uint256)"], provider);
+      const rewardRate = await stakingContract.rewardRate();
+      return ethers.BigNumber.from(rewardRate);
+    };
+
+    const getStakedTokensTotalSupply = async () => {
+      const stakingContract = new ethers.Contract(stakingAddress, ["function totalSupply() view returns (uint256)"], provider);
+      const totalSupply = await stakingContract.totalSupply();
+      return ethers.BigNumber.from(totalSupply);
+    }
+
+
+
     async function driver()
     {
-      const rewards = await getRewards();
-      const tokenSupply = await getTokenSupply();
-      const stakedPlusRewards = await getBalanceOfStakingContract();
-      const trueStaked = stakedPlusRewards.sub(rewards);
-      const percentStaked = trueStaked.mul(100).div(tokenSupply);
-      // get the DOM elements and update them
-      // total supply truncated at the first decimal
+      const rewards = await getRewards(); // the total number of rewards distributed
+      const tokenSupply = await getTokenSupply(); // the total supply of kwenta tokens
+      const stakedPlusRewards = await getBalanceOfStakingContract(); // the blance of kwenta tokens in the staking contract
+      const liquidKwentaStaked = stakedPlusRewards.sub(rewards); // the number of liquid kwenta tokens staked
+      const trueStaked = await getStakedTokensTotalSupply(); //stakedPlusRewards.sub(rewards);
+      const rewardRate = await getRewardRate(); // the rate at which rewards are being distributed per second
+      const escrowedTokensCount = await getEscrowedBalance(); // overall number of escrowed tokens
+      const totalEscrowedStaking = trueStaked.sub(liquidKwentaStaked); // the number of escrowed tokens eligible for staking rewards
+      const APY = rewardRate.mul(secondsPerYear).mul(10000).div(trueStaked); // APY is the reward rate per year, multiplied by 10000 to get 2 decimal places
+      const APYRateAdjusted = APY.mul(60).div(100); // we multiply by 60% to get the APY of the staking contract
+      const percentStaked = trueStaked.mul(100).div(tokenSupply); // the percentage of the total supply that is staked
+      const forfeitedKWENTA = await getForfeitKWENTA(); // the number of kwenta tokens forfeited by users who vest early
+
+
+      // stringifying the numbers
       const rewardString = ethers.utils.formatEther(rewards);
       const supplyString = ethers.utils.formatEther(tokenSupply);
       const trueStakedString = ethers.utils.formatEther(trueStaked);
       const percentStakedString = percentStaked.toString();
+      const forfeitedKWENTAString = ethers.utils.formatEther(forfeitedKWENTA);
+      const totalEscrowedStakingString = ethers.utils.formatEther(totalEscrowedStaking);
+      const fixedAPYString = APYRateAdjusted.toString().substring(0, APYRateAdjusted.toString().length - 2) + "." + APYRateAdjusted.toString().substring(APYRateAdjusted.toString().length - 2, APYRateAdjusted.toString().length);
+
       document.getElementById("total-supply").innerHTML = supplyString.substring(0, supplyString.indexOf(".") + 3);
       document.getElementById("total-staked").innerHTML = trueStakedString.substring(0, trueStakedString.indexOf(".") + 3);
       document.getElementById("total-rewards-added").innerHTML = rewardString.substring(0, rewardString.indexOf(".") + 3);
       document.getElementById("percentage-staked").innerHTML = percentStakedString.substring(0, percentStakedString.indexOf(".") + 3) + "%";
+      document.getElementById("total-burnt").innerHTML = forfeitedKWENTAString.substring(0, forfeitedKWENTAString.indexOf(".") + 3);
+      document.getElementById("total-escrowed-staking").innerHTML = totalEscrowedStakingString.substring(0, totalEscrowedStakingString.indexOf(".") + 3);
+      document.getElementById("reward-apy").innerHTML = fixedAPYString + "%";
+
     }
 
     driver();
@@ -130,9 +249,14 @@
   </script>
 </body>
 <style>
+
+  /* gold radial-gradient(white, rgba(201, 151, 90, 1) 0px, transparent 320px) */
+  /* blue radial-gradient(white, rgba(2, 225, 255, 0.3) 0px, transparent 280px)  */
+  /* grey rgba(25, 24, 24, 0.5) */
   body {
     font-family: 'Special Elite', cursive;
-    background-image: linear-gradient(to right, rgba(13, 24, 42), rgba(8, 12, 21), rgba(28, 19, 38));
+    background-image:  linear-gradient(to right, rgba(2, 225, 255, .8), rgba(25, 24, 24, 1), rgba(25, 24, 24, 1), rgba(201, 151, 90, .8))
+    /* linear-gradient(to right, rgba(13, 24, 42), rgba(8, 12, 21), rgba(28, 19, 38)); */
   }
 
   footer {
@@ -163,7 +287,7 @@
     justify-content: center;
     align-items: center;
     width:100%;
-    max-width:600px;
+    max-width:485px;
     height: 300px;
   }
 
