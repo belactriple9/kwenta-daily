@@ -1,0 +1,1 @@
+{"name":"Kwentapedia","version":"1.0.0","description":"A bot holding all the kwentas in the world","main":"bot.js","author":"belac","devDependencies":{"@types/node":"^18.11.15"},"dependencies":{"discord.js":"^14.7.1","ethers":"^5.7.2","node-fetch":"^2.6.7"}}
