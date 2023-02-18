@@ -206,13 +206,6 @@
       return ethers.BigNumber.from(totalSupply);
     }
 
-    const getClaimedRewards = async () => {
-      // inside the staking rewards contract we can call the  function totalSupply() external view override returns (uint256) to get the total amount staking
-      const stakingContract = new ethers.Contract(stakingAddress, ["function totalSupply() view returns (uint256)"], provider);
-      const totalSupply = await stakingContract.totalSupply(); // the amount of KWENTA staked including excrowed staking. 
-
-
-    }
 
 
 
@@ -234,8 +227,6 @@
       const percentStaked = trueStaked.mul(100).div(tokenSupply); // the percentage of the total supply that is staked
       const forfeitedKWENTA = await getForfeitKWENTA(); // the number of kwenta tokens forfeited by users who vest early
 
-      getClaimedRewards();
-
       // stringifying the numbers
       const rewardString = ethers.utils.formatEther(rewards);
       const supplyString = ethers.utils.formatEther(tokenSupply);
@@ -250,8 +241,9 @@
       document.getElementById("total-rewards-added").innerHTML = rewardString.substring(0, rewardString.indexOf(".") + 3);
       document.getElementById("percentage-staked").innerHTML = percentStakedString.substring(0, percentStakedString.indexOf(".") + 3) + "%";
       document.getElementById("total-burnt").innerHTML = forfeitedKWENTAString.substring(0, forfeitedKWENTAString.indexOf(".") + 3);
+      document.getElementById("total-escrowed-staking").innerHTML = '<iframe src="https://dune.com/embeds/2015439/3336131"/>';
       // document.getElementById("total-escrowed-staking").innerHTML = totalEscrowedStakingString.substring(0, totalEscrowedStakingString.indexOf(".") + 3);
-      document.getElementById("total-escrowed-staking").innerHTML = "untracked";
+      // document.getElementById("total-escrowed-staking").innerHTML = "untracked";
       document.getElementById("reward-apy").innerHTML = fixedAPYString + "%";
 
     }
