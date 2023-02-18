@@ -106,7 +106,7 @@
         topics: [topic]
       };
       // const rewardList = await provider.getLogs(rewardFilter); // not working??
-      const rewardList = await fetch(`https://api-optimistic.etherscan.io/api?module=logs&action=getLogs&address=0x6e56A5D49F775BA08041e28030bc7826b13489e0&topic0=${topic}&page=1&apikey=YourApiKeyToken`)
+      const rewardList = await fetch(`https://api-optimistic.etherscan.io/api?module=logs&action=getLogs&address=${stakingAddress}&topic0=${topic}&page=1&apikey=YourApiKeyToken`)
       .then(response => response.json())
       .then(data => {return data.result});
       const sumRewards = rewardList.reduce((acc, reward) => {
@@ -206,6 +206,16 @@
       return ethers.BigNumber.from(totalSupply);
     }
 
+    const getClaimedRewards = async () => {
+      // inside the staking rewards contract we can call the  function totalSupply() external view override returns (uint256) to get the total amount staking
+      const stakingContract = new ethers.Contract(stakingAddress, ["function totalSupply() view returns (uint256)"], provider);
+      const totalSupply = await stakingContract.totalSupply(); // the amount of KWENTA staked including excrowed staking. 
+
+
+    }
+
+
+
 
 
     async function driver()
@@ -213,16 +223,18 @@
       const rewards = await getRewards(); // the total number of rewards distributed
       const tokenSupply = await getTokenSupply(); // the total supply of kwenta tokens
       const stakedPlusRewards = await getBalanceOfStakingContract(); // the blance of kwenta tokens in the staking contract
-      const liquidKwentaStaked = stakedPlusRewards.sub(rewards); // the number of liquid kwenta tokens staked
+      //stakedPlusRewards.sub(rewards); // this doesn't work because people claim rewards meaning the rewards in the contract will decrease over time.
+      const liquidKwentaStaked = 0  // the number of liquid kwenta tokens staked
       const trueStaked = await getStakedTokensTotalSupply(); //stakedPlusRewards.sub(rewards);
       const rewardRate = await getRewardRate(); // the rate at which rewards are being distributed per second
       const escrowedTokensCount = await getEscrowedBalance(); // overall number of escrowed tokens
-      const totalEscrowedStaking = trueStaked.sub(liquidKwentaStaked); // the number of escrowed tokens eligible for staking rewards
+      const totalEscrowedStaking = 0 // the number of escrowed tokens eligible for staking rewards
       const APY = rewardRate.mul(secondsPerYear).mul(10000).div(trueStaked); // APY is the reward rate per year, multiplied by 10000 to get 2 decimal places
       const APYRateAdjusted = APY.mul(60).div(100); // we multiply by 60% to get the APY of the staking contract
       const percentStaked = trueStaked.mul(100).div(tokenSupply); // the percentage of the total supply that is staked
       const forfeitedKWENTA = await getForfeitKWENTA(); // the number of kwenta tokens forfeited by users who vest early
 
+      getClaimedRewards();
 
       // stringifying the numbers
       const rewardString = ethers.utils.formatEther(rewards);
@@ -238,7 +250,8 @@
       document.getElementById("total-rewards-added").innerHTML = rewardString.substring(0, rewardString.indexOf(".") + 3);
       document.getElementById("percentage-staked").innerHTML = percentStakedString.substring(0, percentStakedString.indexOf(".") + 3) + "%";
       document.getElementById("total-burnt").innerHTML = forfeitedKWENTAString.substring(0, forfeitedKWENTAString.indexOf(".") + 3);
-      document.getElementById("total-escrowed-staking").innerHTML = totalEscrowedStakingString.substring(0, totalEscrowedStakingString.indexOf(".") + 3);
+      // document.getElementById("total-escrowed-staking").innerHTML = totalEscrowedStakingString.substring(0, totalEscrowedStakingString.indexOf(".") + 3);
+      document.getElementById("total-escrowed-staking").innerHTML = "untracked";
       document.getElementById("reward-apy").innerHTML = fixedAPYString + "%";
 
     }
